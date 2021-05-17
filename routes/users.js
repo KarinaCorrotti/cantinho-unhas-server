@@ -10,7 +10,6 @@ router.post('/register', async(req, res) => {
   try{
     await CepCoords.getByCep(req.body.cepUser)
     .then(info => {
-      console.log(info) 
       body.latUser = info.lat;
       body.lonUser = info.lon;      
        //retorna o mesmo 'info' da versão em promise
@@ -23,7 +22,6 @@ router.post('/register', async(req, res) => {
     user.password = undefined;    
     return res.send({ user });
   }catch(error){
-    console.log(error);
     return res.status(400).send({ error: 'Registration failed' });    
   }
 });
@@ -43,20 +41,38 @@ router.delete('/deleteUser', async(req, res) =>{
     await User.findOneAndDelete(req.params.emailUser);    
     return res.send();
   }catch(error){
-    console.log(error);
     return res.status(400).send({ error: 'Error deleting user' });    
   }
 });
 
-router.put('/', async(req, res) => {
-  console.log(req.body.emailUser);
-  console.log(req.body);
-  try{   
+router.put('/updateUser', async(req, res) => {  
+  try{
+    await CepCoords.getByCep(req.body.cepUser)
+    .then(info => {
+      req.body.latUser = info.lat;
+      req.body.lonUser = info.lon;      
+       //retorna o mesmo 'info' da versão em promise
+    })
+    .catch((error) => {      
+      return res.status(400).send({ error: 'Invalid Zip Code' });  
+       //retorna o mesmo parâmetro 'err' da versão em promise
+    })   
     const user = await User.findOneAndUpdate(
       { emailUser: req.body.emailUser }, 
-      { $set: {nameUser: req.body.nameUser} },
-      { new: true, useFindAndModify: false });      
-    // await user.save();    
+      { $set: {nameUser: req.body.nameUser,
+      emailUser: req.body.emailUser,
+      cpfUser: req.body.cpfUser,
+      phoneUser: req.body.phoneUser,
+      cepUser: req.body.cepUser,
+      endUser: req.body.endUser,
+      cidUser: req.body.cidUser,
+      ufUser: req.body.ufUser,
+      nEndUser: req.body.nEndUser,
+      photoUser: req.body.photoUser,
+      latUser: req.body.latUser,
+      lonUser: req.body.lonUser
+      }},
+      { new: true, useFindAndModify: false });       
     return res.send((user));
   }catch(error){    
     return res.status(400).send({ error: 'Error update user' });    
@@ -76,13 +92,11 @@ router.get('/sourceProfessional', async(req, res) => {
     userList.forEach((professional) => {
       professional.distance = Math.abs(professional.latUser - userLat) + Math.abs(professional.lonUser - userLon) * 111;      
     })
-    userList.sort((a,b) => (a.distance> b.distance) ? 1 : ((b.distance> a.distance) ? -1 : 0))
-    console.log(userList)
+    userList.sort((a,b) => (a.distance> b.distance) ? 1 : ((b.distance> a.distance) ? -1 : 0))    
     setTimeout(() => {
       return res.send((userList));
     }, 1000);    
-  }catch(error){
-    console.log(error);
+  }catch(error){    
     return res.status(400).send({ error: 'Error' }); 
   }  
 });
