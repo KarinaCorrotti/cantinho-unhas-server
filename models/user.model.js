@@ -15,7 +15,8 @@ const UserSchema = new mongoose.Schema({
     nEndUser: { type: Number, require: false},
     photoUser: { type: String, require: false},
     latUser: { type: Number, require: false},
-    lonUser: { type: Number, require: false}
+    lonUser: { type: Number, require: false},
+    schedule: { type: Array, require: false, default: []}
 });
 
 UserSchema.pre('save', async function(next){

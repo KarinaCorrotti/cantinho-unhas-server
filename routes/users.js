@@ -4,8 +4,9 @@ const bcrypt = require('bcryptjs');
 const CepCoords = require("coordenadas-do-cep");
 
 const User = require('../models/user.model');
+const { TooManyRequests } = require('http-errors');
 
-router.post('/register', async(req, res) => {  
+router.post('/register', async(req, res) => {  //recebe um parametro com os dados do usuario e registra no banco de dados
   const body = req.body;
   try{
     await CepCoords.getByCep(req.body.cepUser)
@@ -26,7 +27,7 @@ router.post('/register', async(req, res) => {
   }
 });
 
-router.post('/authenticate', async(req, res) =>{
+router.post('/authenticate', async(req, res) =>{ //recebe um parametro com email e senha do usuario e faz a validação
     const { emailUser, password } = req.body;
     const user = await User.findOne({emailUser}).select('+password');
   if(!user)
@@ -36,7 +37,7 @@ router.post('/authenticate', async(req, res) =>{
   res.send({user});
 });
 
-router.delete('/deleteUser', async(req, res) =>{ 
+router.delete('/deleteUser', async(req, res) =>{ //recebe um parametro com email do usuario para deletar do banco de dados
   try{
     await User.findOneAndDelete(req.params.emailUser);    
     return res.send();
@@ -45,7 +46,7 @@ router.delete('/deleteUser', async(req, res) =>{
   }
 });
 
-router.put('/updateUser', async(req, res) => {  
+router.put('/updateUser', async(req, res) => {  //recebe um parametro dados do usuario para serem alterados
   try{
     await CepCoords.getByCep(req.body.cepUser)
     .then(info => {
@@ -79,7 +80,7 @@ router.put('/updateUser', async(req, res) => {
   }  
 });
 
-router.get('/sourceProfessional', async(req, res) => {
+router.get('/sourceProfessional', async(req, res) => { //recebe um parametro com a lat e lon do usuario para fazer busca dos profissionais mais proximos
   const radius = 0.05;
   const userLat = parseFloat(req.query.latUser);
   const userLon = parseFloat(req.query.lonUser);
@@ -99,6 +100,56 @@ router.get('/sourceProfessional', async(req, res) => {
   }catch(error){    
     return res.status(400).send({ error: 'Error' }); 
   }  
+});
+
+router.get('/availableSchedule', async(req, res) => {   //rota de retorno dos horários disponiveis da profissional
+  const getDate = new Date().getDate() + 1;
+  const getMonth = (new Date().getMonth() + 1).toLocaleString('en-US', {minimumIntegerDigits: 2, useGrouping:false});
+  const getHours = new Date().getHours() + 1; 
+  let availableSchedule = [];
+   
+  try {
+    const user = await User.findOne(
+      { emailUser: req.query.emailProfessional }
+    )    
+    for (let index = parseInt(getDate); index <= parseInt(getDate) + 7; index++) {  
+      const hours = [11,13,14,15,16,17];    
+      const dayIndex = index.toLocaleString('en-US', {minimumIntegerDigits: 2, useGrouping:false}); 
+      user.schedule.forEach((day) => {
+        if (day.date === `${dayIndex}/${getMonth}`){          
+          const index = hours.indexOf(day.hour);                  
+          if (index > -1) { hours.splice(index, 1) }
+        }
+      })
+      availableSchedule.push({
+        date: `${dayIndex}/${getMonth}`,   
+        hours,
+      })    
+    } 
+    
+    return res.send(availableSchedule);
+  } catch (error) {
+    
+  }
+});
+
+router.post('/schedule', async(req, res) => {   //rota para gravação na agenda do usuario cliente e usuario profissionaç
+  try{
+    const user = await User.updateMany(
+      { emailUser: { $in: [ req.body.emailUser, req.body.emailProfessional ] } }, 
+      { $push: {'schedule': {
+       date: req.body.date,
+       hour: req.body.hour,
+       service: req.body.service,
+       description: req.body.description,
+       client: req.body.emailUser,
+       professional: req.body.emailProfessional
+      }}},
+      { new: true, useFindAndModify: false });       
+      return res.status((204));
+  }catch(error){
+    return res.status(400).send({ error: 'Registration failed' });        
+  }
 });
 
 module.exports = app => app.use('/users', router);
